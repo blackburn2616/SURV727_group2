@@ -93,14 +93,6 @@ We want to use this list to create a loop that extracts the population tables fr
 Build a loop to grab the population tables from each page. Add columns to the original table using `cbind()`.
 
 ```{r}
-for (i in 2:10){
-  url <- paste0(base_url, i)
-  webpage <- read_html(url)
-  nds <- html_elements(webpage, xpath)
-  ...
-  
-  all_restaurants <- all_restaurants %>% rbind(df)
-}
 ```
 
 ## Scraping and Analyzing Text Data
