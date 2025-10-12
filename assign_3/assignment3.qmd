@@ -13,6 +13,8 @@ library(rvest)
 library(tidyverse)
 ```
 
+[Click here for Github Link](https://github.com/blackburn2616/SURV727_group2)
+
 ## Web Scraping
 
 In this assignment, your task is to scrape some information from Wikipedia. We start with the following page about Grand Boulevard, a Chicago Community Area.
