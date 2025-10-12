@@ -32,7 +32,7 @@ gb_html <- read_html("https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago")
 #| label: extract tables
 tables <- html_table(gb_html)
 str(tables)
-#find the position?
+#find the position
 ```
 
 Extract the "Historical population" table from the list and save it as another object. You can use subsetting via `[[…]]` to extract pieces from a list. Print the result.
