@@ -61,7 +61,7 @@ That's it for this page. However, we may want to repeat this process for other c
 
 ```{r}
 #| label: adjacent table
-adjacent <- tables[[3]]
+adjacent <- tables[[4]]
 str(adjacent)
 #how to find table
 ```
@@ -70,24 +70,16 @@ Then, grab the community areas east of Grand Boulevard and save them as a charac
 
 ```{r}
 #| label: areas east chr
-east_gb <- c(adjacent[[5]][1], adjacent[[11]][1], adjacent[[17]][1])
-print(east_gb)
-#is this supposed to use xpath?
-```
-
-```{r}
-#| label: areas east chr xpath
-#areas <- html_elements(gb_html, xpath = '//*[@id="mw-content-text"]/div[1]/div[13]/table/tbody/tr[2]/td/div/table/tbody')
-#str(areas)
-
-#names <- html_text(areas)
-#rm(names)
+east_gb <- adjacent$X3
+east_gb
 ```
 
 We want to use this list to create a loop that extracts the population tables from the Wikipedia pages of these places. To make this work and build valid urls, we need to replace empty spaces in the character vector with underscores. The resulting vector should look like this: "Oakland,\_Chicago" "Kenwood,\_Chicago" "Hyde_Park,\_Chicago"
 
 ```{r}
-
+east_gb_edit <- east_gb |> 
+  str_replace_all(" ", "_") |> 
+  discard(~ .x == "")
 ```
 
 Build a loop to grab the population tables from each page. Add columns to the original table using `cbind()`.
