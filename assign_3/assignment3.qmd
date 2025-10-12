@@ -34,7 +34,9 @@ gb_html <- read_html("https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago")
 #| label: extract tables
 tables <- html_table(gb_html)
 str(tables)
+
 #find the position
+html_element(gb_html, xpath = "//table[caption = 'Historical population']")
 ```
 
 Extract the "Historical population" table from the list and save it as another object. You can use subsetting via `[[…]]` to extract pieces from a list. Print the result.
@@ -52,7 +54,6 @@ You will see that the table needs some additional formatting. Keep only want row
 hist_pop <- hist_pop |> 
     select(Census, `Pop.`, `%±`)
 hist_pop
-#too wide?
 ```
 
 ## Expanding to More Pages
@@ -70,21 +71,45 @@ Then, grab the community areas east of Grand Boulevard and save them as a charac
 
 ```{r}
 #| label: areas east chr
-east_gb <- adjacent$X3
-east_gb
+east_gb <- adjacent |> 
+  select(X3) |> 
+  filter(str_ends(X3, "Chicago"))
+
+east_gb_chr <- east_gb$X3
+print(east_gb_chr)
 ```
 
 We want to use this list to create a loop that extracts the population tables from the Wikipedia pages of these places. To make this work and build valid urls, we need to replace empty spaces in the character vector with underscores. The resulting vector should look like this: "Oakland,\_Chicago" "Kenwood,\_Chicago" "Hyde_Park,\_Chicago"
 
 ```{r}
-east_gb_edit <- east_gb |> 
-  str_replace_all(" ", "_") |> 
-  discard(~ .x == "")
+#| label: remove empty spaces
+east_gb_chr <- east_gb_chr |> 
+  str_replace_all(" ", "_")
 ```
 
 Build a loop to grab the population tables from each page. Add columns to the original table using `cbind()`.
 
 ```{r}
+#| label: loop
+
+tables_all <- list()
+
+for (i in east_gb_chr) {
+  url <- paste0("https://en.wikipedia.org/wiki/", i)
+  webpage <- read_html(url)
+  tables <- webpage |>
+  html_element(xpath = "//table[caption = 'Historical population']")
+  tbl2 <- html_table(tables, fill = TRUE)
+  tables_all[[i]] <- tbl2 |> 
+    select(Census, `Pop.`, `%±`)
+}
+
+do.call(cbind, tables_all)
+
+print(tables_all)
+
+#how to use cbind, what is table supposed to look like
+#hist_pop <- cbind(hist_pop, tables_all$`Kenwood,_Chicago`)
 ```
 
 ## Scraping and Analyzing Text Data
