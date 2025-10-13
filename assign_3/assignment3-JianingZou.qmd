@@ -1,0 +1,251 @@
+---
+title: "Assignment 3"
+subtitle: "Due at 11:59pm on October 14."
+format: pdf
+editor: visual
+---
+
+You may work in pairs or individually for this assignment. Make sure you join a group in Canvas if you are working in pairs. Turn in this assignment as an HTML or PDF file to ELMS. Make sure to include the R Markdown or Quarto file that was used to generate it. Include the GitHub link for the repository containing these files.
+
+```{r}
+library(xml2)
+library(rvest)
+library(tidyverse)
+library(jsonlite)
+library(robotstxt)
+library(RSocrata)
+library(quanteda)
+library(quanteda.textstats)
+```
+
+## Web Scraping
+
+In this assignment, your task is to scrape some information from Wikipedia. We start with the following page about Grand Boulevard, a Chicago Community Area.
+
+<https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago>
+
+The ultimate goal is to gather the table "Historical population" and convert it to a `data.frame`.
+
+As a first step, read in the html page as an R object. Extract the tables from this object (using the `rvest` package) and save the result as a new object. Follow the instructions if there is an error. Use `str()` on this new object -- it should be a list. Try to find the position of the "Historical population" in this list since we need it in the next step.
+
+Extract the "Historical population" table from the list and save it as another object. You can use subsetting via `[[…]]` to extract pieces from a list. Print the result.
+
+You will see that the table needs some additional formatting. Keep only want rows and columns with actual values.
+
+## Expanding to More Pages
+
+That's it for this page. However, we may want to repeat this process for other community areas. The Wikipedia page <https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago> has a section on "Places adjacent to Grand Boulevard, Chicago" at the bottom. Can you find the corresponding table in the list of tables that you created earlier? Extract this table as a new object.
+
+Then, grab the community areas east of Grand Boulevard and save them as a character vector. Print the result.
+
+We want to use this list to create a loop that extracts the population tables from the Wikipedia pages of these places. To make this work and build valid urls, we need to replace empty spaces in the character vector with underscores. The resulting vector should look like this: "Oakland,\_Chicago" "Kenwood,\_Chicago" "Hyde_Park,\_Chicago"
+
+Build a loop to grab the population tables from each page. Add columns to the original table using `cbind()`.
+
+## Scraping and Analyzing Text Data
+
+Suppose we wanted to take the actual text from the Wikipedia pages instead of just the information in the table. Our goal in this section is to extract the text from the body of the pages, then do some basic text cleaning and analysis.
+
+First, scrape just the text without any of the information in the margins or headers. For example, for "Grand Boulevard", the text should start with, "**Grand Boulevard** on the [South Side](https://en.wikipedia.org/wiki/South_Side,_Chicago "South Side, Chicago") of [Chicago](https://en.wikipedia.org/wiki/Chicago "Chicago"), [Illinois](https://en.wikipedia.org/wiki/Illinois "Illinois"), is one of the ...". Make sure all of the text is in one block by using something like the code below (I called my object `description`).
+
+```{r}
+# First check whether robots are allowed on their webpage.
+paths_allowed("https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago")
+
+url <- read_html("https://en.wikipedia.org/wiki/Grand_Boulevard,_Chicago")
+
+text_only <- html_nodes(url, xpath = '//*[(@id = "mw-content-text")]//p')
+
+description <- text_only %>% paste(collapse = ' ')
+```
+
+Using a similar loop as in the last section, grab the descriptions of the various communities areas. Make a tibble with two columns: the name of the location and the text describing the location.
+
+```{r}
+communities <- html_nodes(url, xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "navbox-odd", " " ))]//td//a')
+
+community_names <- html_text(communities)
+print(community_names)
+
+community_links <- html_attr(communities, "href")
+print(community_links)
+
+  # Extract all paragraphs under the main content area
+get_page_paragraphs <- function(name) {
+  slug <- gsub(" ", "_", name, fixed = TRUE)       # convert spaces → underscores
+  url  <- paste0("https://en.wikipedia.org", slug)
+
+  page <- read_html(url)
+
+  paragraphs <- page %>%
+    html_nodes(xpath = '//p') %>%
+    html_text2() %>%
+    str_squish()
+
+  tibble(
+    page = name,            # keeps the readable name like "Armour Square, Chicago"
+    paragraph = paragraphs %>% paste(collapse = ' ')
+  )
+}
+
+all_text <- map_dfr(community_links, get_page_paragraphs)
+
+all_text <- all_text %>%
+  mutate(page = page %>%
+           str_remove("^/wiki/") %>%           
+           str_remove("\\(neighborhood\\)") %>% 
+           str_replace_all("_", " ") %>%       
+           str_squish())                        
+```
+
+Let's clean the data using `tidytext`. If you have trouble with this section, see the example shown in <https://www.tidytextmining.com/tidytext.html>
+
+```{r}
+library(tidytext)
+```
+
+Create tokens using `unnest_tokens`. Make sure the data is in one-token-per-row format. Remove any stop words within the data. What are the most common words used overall?
+
+**Answer**
+
+The most common words are:
+park:127, chicago:118, area:100, hyde:75, neighborhood:73, street:62, communiti:58, south:46, citi:38, hous:38.
+
+```{r}
+com_corpus <- corpus(all_text, text_field = "paragraph")
+com_tokens <- tokens(com_corpus, what = c("word"))
+com_tokens_cleaned <- com_tokens %>%
+                    tokens_tolower() %>%
+                    tokens(remove_punct = TRUE) %>%
+                    tokens_remove(stopwords("en")) %>%
+                    tokens_wordstem(language = "en")
+com_tokens
+com_tokens_cleaned  
+```
+
+```{r}
+
+cat("\nType of variable:\n")
+class(com_tokens_cleaned)
+mode(com_tokens_cleaned)
+cat("\nNumber of elements\n")
+length(com_tokens_cleaned)
+cat("\nNumber of tokens")
+sapply(com_tokens_cleaned, length) %>% table
+```
+
+```{r}
+unigrams <- com_tokens_cleaned; 
+    cat("\nUnigrams :"); print(com_tokens_cleaned)
+bigrams <- unigrams %>% tokens_ngrams(n=2); 
+    cat("\nBigrams :"); print(bigrams)
+trigrams <- unigrams %>% tokens_ngrams(n=3); 
+    cat("\nTrigrams :"); print(trigrams)
+skipgrams1 <- unigrams %>% tokens_ngrams(n=3, skip = c(0,1))
+    cat("\nTrigrams(including 1-skip) :"); print(skipgrams1)
+
+```
+```{r}
+# Create document-feature matrix
+com_DFM <- dfm(com_tokens_cleaned) 
+cat("\nInitial sparsity: \n")
+dim(com_DFM)
+
+# Calculating word frequencies
+topfeatures(com_DFM)
+```
+
+
+
+Plot the most common words within each location. What are some of the similarities between the locations? What are some of the differences?
+
+**Answer**
+
+text2(Douglas, Chicago) – text8(New City, Chicago) are the most similar because Jaccard score is $0.214$,which is the highest among all pairs. That might because they share similar words more than sharing with other groups.
+
+
+```{r}
+R_corpus <- corpus(all_text, 
+                  docid_field="page", 
+                  text_field="paragraph")
+R_corpus
+```
+
+```{r}
+# Tokenize
+R_tokens <- tokens(R_corpus, what = c("word"))
+R_tokens[1:5]
+print("Token lengths: "); cat("\n\n")
+print(sapply(R_tokens[1:5], length))
+
+
+
+R_tokens_cleaned <- R_tokens %>%
+  tokens(remove_numbers   = TRUE,
+         remove_punct     = TRUE,
+         remove_symbols   = TRUE,
+         remove_separators= TRUE) %>%
+  tokens_tolower() %>%
+  tokens_remove(stopwords("en")) %>%
+  tokens_wordstem(language = "en")
+
+R_tokens[2:4]                 
+R_tokens_cleaned[2:4]
+
+```
+
+```{r}
+# Document - Feature Matrix (DFM) building
+R_DFM <- dfm(R_tokens_cleaned) 
+R_DFM
+```
+
+```{r}
+
+topfeatures(R_DFM, 
+            groups = community_names, 
+            n = 20)
+
+freq <- topfeatures(R_DFM, 
+            groups = community_names, 
+            n = 20)
+
+freq_df <- map2_dfr(
+  freq, names(freq),
+  ~ tibble(
+      community = .y,
+      feature   = names(.x),
+      frequency = as.numeric(.x)
+    )
+)
+
+# loop through each community and print its own plot
+for (c in unique(freq_df$community)) {
+  sub_df <- filter(freq_df, community == c)
+
+  p <- ggplot(sub_df, aes(x = fct_reorder(feature, frequency), y = frequency)) +
+    geom_col(fill = "blue") +
+    coord_flip() +
+    labs(
+      x = NULL, y = "Frequency",
+      title = paste("Top 20 tokens in", c)
+    ) +
+    theme_minimal(base_size = 12)
+
+  print(p)  # prints each plot separately
+}
+
+```
+
+
+
+```{r}
+# Find similar text
+
+com_1 <- textstat_simil(com_DFM, 
+               margin = "documents",
+               method = "jaccard")
+
+```
+
+
