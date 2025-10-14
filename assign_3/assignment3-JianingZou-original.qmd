@@ -70,8 +70,9 @@ print(community_names)
 community_links <- html_attr(communities, "href")
 print(community_links)
 
+  # Extract all paragraphs under the main content area
 get_page_paragraphs <- function(name) {
-  slug <- gsub(" ", "_", name, fixed = TRUE)
+  slug <- gsub(" ", "_", name, fixed = TRUE)       # convert spaces → underscores
   url  <- paste0("https://en.wikipedia.org", slug)
 
   page <- read_html(url)
@@ -82,7 +83,7 @@ get_page_paragraphs <- function(name) {
     str_squish()
 
   tibble(
-    page = name,
+    page = name,            # keeps the readable name like "Armour Square, Chicago"
     paragraph = paragraphs %>% paste(collapse = ' ')
   )
 }
@@ -94,9 +95,7 @@ all_text <- all_text %>%
            str_remove("^/wiki/") %>%           
            str_remove("\\(neighborhood\\)") %>% 
            str_replace_all("_", " ") %>%       
-           str_squish())    
-
-
+           str_squish())                        
 ```
 
 Let's clean the data using `tidytext`. If you have trouble with this section, see the example shown in <https://www.tidytextmining.com/tidytext.html>
@@ -147,10 +146,12 @@ skipgrams1 <- unigrams %>% tokens_ngrams(n=3, skip = c(0,1))
 ```
 
 ```{r}
+# Create document-feature matrix
 com_DFM <- dfm(com_tokens_cleaned) 
 cat("\nInitial sparsity: \n")
 dim(com_DFM)
 
+# Calculating word frequencies
 topfeatures(com_DFM)
 ```
 
@@ -168,6 +169,7 @@ R_corpus
 ```
 
 ```{r}
+# Tokenize
 R_tokens <- tokens(R_corpus, what = c("word"))
 R_tokens[1:5]
 print("Token lengths: "); cat("\n\n")
@@ -190,11 +192,13 @@ R_tokens_cleaned[2:4]
 ```
 
 ```{r}
+# Document - Feature Matrix (DFM) building
 R_DFM <- dfm(R_tokens_cleaned) 
 R_DFM
 ```
 
 ```{r}
+
 topfeatures(R_DFM, 
             groups = community_names, 
             n = 20)
@@ -212,7 +216,7 @@ freq_df <- map2_dfr(
     )
 )
 
-
+# loop through each community and print its own plot
 for (c in unique(freq_df$community)) {
   sub_df <- filter(freq_df, community == c)
 
@@ -225,12 +229,16 @@ for (c in unique(freq_df$community)) {
     ) +
     theme_minimal(base_size = 12)
 
-  print(p)
+  print(p)  # prints each plot separately
 }
+
 ```
 
 ```{r}
+# Find similar text
+
 com_1 <- textstat_simil(com_DFM, 
                margin = "documents",
                method = "jaccard")
+
 ```
